@@ -1,0 +1,50 @@
+---
+import { getCollection } from 'astro:content';
+import BaseHead from '../../components/BaseHead.astro';
+import CategoryTabs from '../../components/CategoryTabs.astro';
+import Footer from '../../components/Footer.astro';
+import Header from '../../components/Header.astro';
+import PostList from '../../components/PostList.astro';
+import { CATEGORY_KEYS, CATEGORY_META, type CategoryKey } from '../../content/categories';
+import { SITE_TITLE } from '../../consts';
+
+export async function getStaticPaths() {
+	const allPosts = await getCollection('blog');
+	return CATEGORY_KEYS.map((category) => ({
+		params: { category },
+		props: {
+			posts: allPosts
+				.filter((post) => post.data.categories?.includes(category))
+				.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()),
+		},
+	}));
+}
+
+interface Props {
+	posts: Awaited<ReturnType<typeof getCollection<'blog'>>>;
+}
+
+const { posts } = Astro.props;
+const category = Astro.params.category as CategoryKey;
+const { label } = CATEGORY_META[category];
+---
+
+<!doctype html>
+<html lang="ko">
+	<head>
+		<BaseHead title={`${label} — ${SITE_TITLE}`} description={`${label} 카테고리 글 목록`} />
+		<style>
+			main {
+				width: 720px;
+			}
+		</style>
+	</head>
+	<body>
+		<Header />
+		<main>
+			<CategoryTabs active={category} />
+			<PostList posts={posts} />
+		</main>
+		<Footer />
+	</body>
+</html>

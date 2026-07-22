@@ -1,0 +1,53 @@
+---
+import { CATEGORY_KEYS, CATEGORY_META, type CategoryKey } from '../content/categories';
+
+interface Props {
+	active: 'all' | CategoryKey;
+}
+
+const { active } = Astro.props;
+const sorted = [...CATEGORY_KEYS].sort((a, b) => CATEGORY_META[a].order - CATEGORY_META[b].order);
+---
+
+<nav class="category-tabs">
+	<a href={`${import.meta.env.BASE_URL}blog/`} class:list={[{ active: active === 'all' }]}>
+		전체글
+	</a>
+	{
+		sorted.map((key) => (
+			<a
+				href={`${import.meta.env.BASE_URL}blog/${key}/`}
+				class:list={[{ active: active === key }]}
+			>
+				{CATEGORY_META[key].label}
+			</a>
+		))
+	}
+</nav>
+
+<style>
+	.category-tabs {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1.5em;
+		padding-bottom: 1em;
+		margin-bottom: 1.5em;
+		border-bottom: 1px solid var(--rule);
+	}
+	.category-tabs a {
+		font-family: var(--font-sans);
+		font-size: 0.9em;
+		letter-spacing: 0.04em;
+		color: var(--ink-dim);
+		text-decoration: none;
+		padding-bottom: 0.3em;
+		border-bottom: 2px solid transparent;
+	}
+	.category-tabs a.active {
+		color: var(--ink);
+		border-bottom-color: var(--accent-bright);
+	}
+	.category-tabs a:hover {
+		color: var(--ink);
+	}
+</style>
