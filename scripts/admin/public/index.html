@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="ko">
+	<head>
+		<meta charset="utf-8" />
+		<title>콘텐츠 입력 폼</title>
+		<style>
+			:root {
+				color-scheme: dark;
+			}
+			body {
+				background: #1a1414;
+				color: #ece6e2;
+				font-family: system-ui, sans-serif;
+				max-width: 1020px;
+				margin: 0 auto;
+				padding: 2em 1.5em 4em;
+			}
+			.layout {
+				display: flex;
+				gap: 2.5em;
+				align-items: flex-start;
+			}
+			.main-col {
+				flex: 1;
+				min-width: 0;
+			}
+			.side-col {
+				width: 240px;
+				flex-shrink: 0;
+				border-left: 1px solid #4a3d3a;
+				padding-left: 1.5em;
+				position: sticky;
+				top: 1em;
+			}
+			.side-col h3 {
+				font-size: 0.95em;
+				margin: 0 0 0.5em;
+			}
+			.connection-list {
+				list-style: none;
+				margin: 0 0 0.3em;
+				padding: 0;
+			}
+			.connection-list li {
+				font-size: 0.85em;
+				padding: 0.3em 0;
+				border-bottom: 1px solid #2f2523;
+			}
+			@media (max-width: 800px) {
+				.layout {
+					flex-direction: column;
+				}
+				.side-col {
+					width: auto;
+					border-left: none;
+					border-top: 1px solid #4a3d3a;
+					padding-left: 0;
+					padding-top: 1em;
+					position: static;
+				}
+			}
+			h1 {
+				font-size: 1.3em;
+			}
+			label {
+				display: block;
+				font-size: 0.85em;
+				color: #b8aca6;
+				margin: 1.2em 0 0.3em;
+			}
+			input[type='text'],
+			input[type='date'],
+			textarea,
+			select {
+				width: 100%;
+				box-sizing: border-box;
+				background: #241d1d;
+				border: 1px solid #4a3d3a;
+				color: inherit;
+				padding: 0.5em 0.6em;
+				border-radius: 4px;
+				font: inherit;
+			}
+			textarea {
+				min-height: 8em;
+				resize: vertical;
+			}
+			.row {
+				display: flex;
+				gap: 0.5em;
+				margin-bottom: 0.4em;
+			}
+			.row input {
+				flex: 1;
+			}
+			.row button,
+			.small-button {
+				background: none;
+				border: 1px solid #4a3d3a;
+				color: #b8aca6;
+				border-radius: 4px;
+				cursor: pointer;
+				padding: 0.3em 0.7em;
+			}
+			.row button:hover,
+			.small-button:hover {
+				color: #e0a45e;
+				border-color: #e0a45e;
+			}
+			.chips {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.4em;
+				margin: 0.4em 0;
+			}
+			.chip {
+				background: #2f2523;
+				border: 1px solid #4a3d3a;
+				border-radius: 999px;
+				padding: 0.2em 0.4em 0.2em 0.8em;
+				font-size: 0.85em;
+				display: flex;
+				align-items: center;
+				gap: 0.4em;
+			}
+			.chip button {
+				background: none;
+				border: none;
+				color: #b8aca6;
+				cursor: pointer;
+				font-size: 1em;
+			}
+			.tag-results {
+				border: 1px solid #4a3d3a;
+				border-radius: 4px;
+				max-height: 10em;
+				overflow-y: auto;
+				margin-top: 0.3em;
+			}
+			.tag-results div {
+				padding: 0.4em 0.6em;
+				cursor: pointer;
+				font-size: 0.9em;
+			}
+			.tag-results div:hover {
+				background: #2f2523;
+			}
+			.tag-results .new-option {
+				color: #e0a45e;
+			}
+			#submit {
+				margin-top: 2em;
+				background: #7a3b2e;
+				border: none;
+				color: #fff;
+				padding: 0.7em 1.4em;
+				border-radius: 4px;
+				font-size: 1em;
+				cursor: pointer;
+			}
+			#status {
+				margin-top: 1em;
+				font-size: 0.9em;
+			}
+			.status-ok {
+				color: #8fbf7f;
+			}
+			.status-error {
+				color: #d97b6c;
+			}
+			.hint {
+				font-size: 0.8em;
+				color: #8a7d78;
+			}
+			.two-col {
+				display: flex;
+				gap: 1em;
+			}
+			.two-col > div {
+				flex: 1;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>콘텐츠 입력 폼</h1>
+		<p class="hint">src/content/에 markdown 파일로 직접 저장됩니다. 이 폼은 로컬 전용이고 배포엔 포함되지 않습니다.</p>
+
+		<label for="collection">컬렉션</label>
+		<select id="collection">
+			<option value="objects">objects (객체)</option>
+			<option value="blog">blog (글)</option>
+		</select>
+
+		<div class="layout">
+		<div class="main-col">
+
+		<!-- ===================== objects 폼 ===================== -->
+		<section id="objectsSection">
+			<label for="objMode">모드</label>
+			<select id="objMode">
+				<option value="new">새로 만들기</option>
+				<option value="edit">기존 객체 불러와 수정</option>
+			</select>
+
+			<div id="objEditPicker" style="display: none">
+				<label for="objExisting">수정할 객체</label>
+				<select id="objExisting"></select>
+			</div>
+
+			<label for="objId">파일명 (id) <span class="hint">— 다른 객체가 relatedObjects에서 이 이름으로 참조함</span></label>
+			<input type="text" id="objId" />
+
+			<label for="objType">타입</label>
+			<input type="text" id="objType" list="typeOptions" />
+			<datalist id="typeOptions"></datalist>
+
+			<label for="objTitle">제목 (title)</label>
+			<input type="text" id="objTitle" />
+
+			<label for="objDescription">한 줄 설명 (description, 선택)</label>
+			<input type="text" id="objDescription" />
+
+			<label>속성 (attributes)</label>
+			<div id="attributeRows"></div>
+			<button type="button" class="small-button" id="addAttribute">+ 속성 행 추가</button>
+
+			<label>관련 객체 (relatedObjects)</label>
+			<input type="text" id="objRelatedSearch" placeholder="제목으로 검색..." />
+			<div class="tag-results" id="objRelatedResults"></div>
+			<div class="chips" id="objRelatedChips"></div>
+
+			<label for="objBody">본문</label>
+			<textarea id="objBody"></textarea>
+		</section>
+
+		<!-- ===================== blog 폼 ===================== -->
+		<section id="blogSection" style="display: none">
+			<label for="blogMode">모드</label>
+			<select id="blogMode">
+				<option value="new">새로 만들기</option>
+				<option value="edit">기존 글 불러와 수정</option>
+			</select>
+
+			<div id="blogEditPicker" style="display: none">
+				<label for="blogExisting">수정할 글</label>
+				<select id="blogExisting"></select>
+			</div>
+
+			<label for="blogId">파일명 (id) <span class="hint">— URL 슬러그의 기반이 됨</span></label>
+			<input type="text" id="blogId" />
+
+			<label for="blogTitle">제목 (title)</label>
+			<input type="text" id="blogTitle" />
+
+			<label for="blogDescription">한 줄 설명 (description)</label>
+			<input type="text" id="blogDescription" />
+
+			<div class="two-col">
+				<div>
+					<label for="blogPubDate">발행일 (pubDate)</label>
+					<input type="date" id="blogPubDate" />
+				</div>
+				<div>
+					<label for="blogUpdatedDate">수정일 (updatedDate, 선택)</label>
+					<input type="date" id="blogUpdatedDate" />
+				</div>
+			</div>
+
+			<label for="blogHeroImage">
+				헤더 이미지 경로 (heroImage, 선택) <span class="hint">— 실제 이미지 파일은 직접 assets에 넣고 상대경로만 입력</span>
+			</label>
+			<input type="text" id="blogHeroImage" placeholder="../../assets/xxx.jpg" />
+
+			<label>카테고리 (categories)</label>
+			<input type="text" id="blogCategorySearch" placeholder="검색하거나 새 카테고리 입력..." />
+			<div class="tag-results" id="blogCategoryResults"></div>
+			<div class="chips" id="blogCategoryChips"></div>
+
+			<label>관련 객체 (relatedObjects)</label>
+			<input type="text" id="blogRelatedSearch" placeholder="제목으로 검색..." />
+			<div class="tag-results" id="blogRelatedResults"></div>
+			<div class="chips" id="blogRelatedChips"></div>
+
+			<label for="blogBody">본문</label>
+			<textarea id="blogBody" style="min-height: 16em"></textarea>
+		</section>
+
+		<button id="submit">저장</button>
+		<div id="status"></div>
+
+		</div>
+
+		<aside class="side-col" id="connectionsPanel"></aside>
+		</div>
+
+		<script>
+			const el = (id) => document.getElementById(id);
+
+			// ---------- 공용 태그 피커 (검색 + 칩) ----------
+			// relatedObjects(objects/blog)와 categories(blog)가 전부 같은 상호작용
+			// 패턴(검색 → 클릭해서 칩으로 추가 → x로 제거)이라 하나로 공유한다.
+			function createTagPicker({ searchInputId, resultsId, chipsId, getOptions, allowNew, onChange }) {
+				let selected = [];
+
+				function render() {
+					el(chipsId).innerHTML = selected
+						.map((v) => `<span class="chip">${v}<button type="button" data-v="${v}">✕</button></span>`)
+						.join('');
+					el(chipsId)
+						.querySelectorAll('button')
+						.forEach((btn) =>
+							btn.addEventListener('click', () => {
+								selected = selected.filter((v) => v !== btn.dataset.v);
+								render();
+							}),
+						);
+					onChange?.();
+				}
+
+				el(searchInputId).addEventListener('input', () => {
+					const q = el(searchInputId).value.trim();
+					const resultsEl = el(resultsId);
+					if (!q) {
+						resultsEl.innerHTML = '';
+						return;
+					}
+					const options = getOptions();
+					const matches = options
+						.filter((o) => !selected.includes(o.value))
+						.filter((o) => o.label.toLowerCase().includes(q.toLowerCase()))
+						.slice(0, 20);
+
+					let html = matches.map((o) => `<div data-v="${o.value}">${o.label}</div>`).join('');
+					if (allowNew && !options.some((o) => o.value === q)) {
+						html += `<div data-v="${q}" class="new-option">+ 새로 추가: ${q}</div>`;
+					}
+					resultsEl.innerHTML = html;
+					resultsEl.querySelectorAll('div').forEach((div) =>
+						div.addEventListener('click', () => {
+							selected.push(div.dataset.v);
+							render();
+							el(searchInputId).value = '';
+							resultsEl.innerHTML = '';
+						}),
+					);
+				});
+
+				return {
+					get: () => selected,
+					set: (vals) => {
+						selected = [...(vals ?? [])];
+						render();
+					},
+				};
+			}
+
+			// ---------- objects 폼 ----------
+			let objMeta = { objects: [], types: [], attributeKeysByType: {}, attributeValuesByType: {} };
+
+			const objRelatedPicker = createTagPicker({
+				searchInputId: 'objRelatedSearch',
+				resultsId: 'objRelatedResults',
+				chipsId: 'objRelatedChips',
+				getOptions: () => objMeta.objects.map((o) => ({ value: o.id, label: `${o.title} (${o.type})` })),
+				allowNew: false,
+				onChange: () => renderConnections(),
+			});
+
+			async function loadObjMeta() {
+				objMeta = await fetch('/api/meta').then((r) => r.json());
+				el('typeOptions').innerHTML = objMeta.types.map((t) => `<option value="${t}">`).join('');
+				el('objExisting').innerHTML = objMeta.objects
+					.map((o) => `<option value="${o.id}">${o.title} (${o.type})</option>`)
+					.join('');
+			}
+
+			function populateDatalist(listEl, values) {
+				listEl.innerHTML = values.map((v) => `<option value="${v}">`).join('');
+			}
+
+			// 키 자동완성은 현재 타입이 기준, 값 자동완성은 "현재 타입 + 이 행의 키"가
+			// 기준이라 키를 바꿀 때마다, 그리고 타입을 바꿀 때마다 다시 계산해야 한다.
+			function refreshRowSuggestions(row) {
+				const type = el('objType').value;
+				const keyInput = row.querySelector('.attr-key');
+				populateDatalist(row.querySelector('.attr-key-list'), objMeta.attributeKeysByType[type] ?? []);
+				const values = objMeta.attributeValuesByType[type]?.[keyInput.value] ?? [];
+				populateDatalist(row.querySelector('.attr-value-list'), values);
+			}
+
+			function addAttributeRow(key = '', value = '') {
+				const row = document.createElement('div');
+				row.className = 'row';
+				const keyListId = `attr-keys-${Math.random().toString(36).slice(2)}`;
+				const valueListId = `attr-values-${Math.random().toString(36).slice(2)}`;
+				row.innerHTML = `
+					<input type="text" placeholder="키" class="attr-key" list="${keyListId}" value="${key}">
+					<datalist class="attr-key-list" id="${keyListId}"></datalist>
+					<input type="text" placeholder="값" class="attr-value" list="${valueListId}" value="${value}">
+					<datalist class="attr-value-list" id="${valueListId}"></datalist>
+					<button type="button">✕</button>
+				`;
+				row.querySelector('.attr-key').addEventListener('input', () => refreshRowSuggestions(row));
+				row.querySelector('button').addEventListener('click', () => row.remove());
+				el('attributeRows').appendChild(row);
+				refreshRowSuggestions(row);
+			}
+
+			el('addAttribute').addEventListener('click', () => addAttributeRow());
+
+			// 새로 만들기 모드에서 타입을 지정하면, 그 타입에 등록된 적 있는 속성 키를
+			// 전부 빈 값으로 깔아준다 — 필요 없는 건 사용자가 ✕로 빼는 "뺄셈" 방식.
+			// 수정 모드에서는 불러온 객체의 실제 속성을 건드리지 않고 추천만 갱신한다.
+			function populateAllAttributesForType() {
+				const type = el('objType').value;
+				const keys = objMeta.attributeKeysByType[type] ?? [];
+				el('attributeRows').innerHTML = '';
+				if (keys.length === 0) {
+					addAttributeRow();
+					return;
+				}
+				for (const key of keys) addAttributeRow(key, '');
+			}
+
+			el('objType').addEventListener('input', () => {
+				if (el('objMode').value === 'new') {
+					populateAllAttributesForType();
+				} else {
+					document.querySelectorAll('#attributeRows .row').forEach(refreshRowSuggestions);
+				}
+			});
+
+			function resetObjectForm() {
+				el('objId').value = '';
+				el('objType').value = '';
+				el('objTitle').value = '';
+				el('objDescription').value = '';
+				el('objBody').value = '';
+				el('objExisting').value = '';
+				el('attributeRows').innerHTML = '';
+				addAttributeRow();
+				objRelatedPicker.set([]);
+			}
+
+			el('objMode').addEventListener('change', () => {
+				el('objEditPicker').style.display = el('objMode').value === 'edit' ? 'block' : 'none';
+				if (el('objMode').value === 'new') resetObjectForm();
+			});
+
+			el('objExisting').addEventListener('change', async () => {
+				const id = el('objExisting').value;
+				if (!id) return;
+				const entry = await fetch(`/api/objects/${encodeURIComponent(id)}`).then((r) => r.json());
+				el('objId').value = entry.id;
+				el('objType').value = entry.type ?? '';
+				el('objTitle').value = entry.title ?? '';
+				el('objDescription').value = entry.description ?? '';
+				el('objBody').value = (entry.body ?? '').trim();
+				el('attributeRows').innerHTML = '';
+				for (const [key, value] of Object.entries(entry.attributes ?? {})) {
+					addAttributeRow(key, String(value));
+				}
+				objRelatedPicker.set(entry.relatedObjects ?? []);
+			});
+
+			// 역참조(누가 이 id를 가리키는지)는 파일명(id)에 따라 달라지므로,
+			// id를 타이핑할 때마다도 연결 패널을 다시 계산한다.
+			el('objId').addEventListener('input', () => renderConnections());
+
+			async function submitObject() {
+				const attributes = [...document.querySelectorAll('#attributeRows .row')].map((row) => ({
+					key: row.querySelector('.attr-key').value,
+					value: row.querySelector('.attr-value').value,
+				}));
+
+				return fetch('/api/objects', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						id: el('objId').value.trim(),
+						isEdit: el('objMode').value === 'edit',
+						type: el('objType').value.trim(),
+						title: el('objTitle').value.trim(),
+						description: el('objDescription').value.trim(),
+						attributes,
+						relatedObjects: objRelatedPicker.get(),
+						body: el('objBody').value,
+					}),
+				});
+			}
+
+			// ---------- blog 폼 ----------
+			let blogMeta = { posts: [], categories: [] };
+
+			const blogCategoryPicker = createTagPicker({
+				searchInputId: 'blogCategorySearch',
+				resultsId: 'blogCategoryResults',
+				chipsId: 'blogCategoryChips',
+				getOptions: () => blogMeta.categories.map((c) => ({ value: c, label: c })),
+				allowNew: true,
+			});
+
+			const blogRelatedPicker = createTagPicker({
+				searchInputId: 'blogRelatedSearch',
+				resultsId: 'blogRelatedResults',
+				chipsId: 'blogRelatedChips',
+				getOptions: () => objMeta.objects.map((o) => ({ value: o.id, label: `${o.title} (${o.type})` })),
+				allowNew: false,
+				onChange: () => renderConnections(),
+			});
+
+			async function loadBlogMeta() {
+				blogMeta = await fetch('/api/blog/meta').then((r) => r.json());
+				el('blogExisting').innerHTML = blogMeta.posts
+					.map((p) => `<option value="${p.id}">${p.title}</option>`)
+					.join('');
+			}
+
+			function resetBlogForm() {
+				el('blogId').value = '';
+				el('blogTitle').value = '';
+				el('blogDescription').value = '';
+				el('blogPubDate').value = new Date().toISOString().slice(0, 10);
+				el('blogUpdatedDate').value = '';
+				el('blogHeroImage').value = '';
+				el('blogBody').value = '';
+				el('blogExisting').value = '';
+				blogCategoryPicker.set([]);
+				blogRelatedPicker.set([]);
+			}
+
+			el('blogMode').addEventListener('change', () => {
+				el('blogEditPicker').style.display = el('blogMode').value === 'edit' ? 'block' : 'none';
+				if (el('blogMode').value === 'new') resetBlogForm();
+			});
+
+			function toDateInputValue(value) {
+				if (!value) return '';
+				const d = new Date(value);
+				if (Number.isNaN(d.valueOf())) return '';
+				return d.toISOString().slice(0, 10);
+			}
+
+			el('blogExisting').addEventListener('change', async () => {
+				const id = el('blogExisting').value;
+				if (!id) return;
+				const entry = await fetch(`/api/blog/${encodeURIComponent(id)}`).then((r) => r.json());
+				el('blogId').value = entry.id;
+				el('blogTitle').value = entry.title ?? '';
+				el('blogDescription').value = entry.description ?? '';
+				el('blogPubDate').value = toDateInputValue(entry.pubDate);
+				el('blogUpdatedDate').value = toDateInputValue(entry.updatedDate);
+				el('blogHeroImage').value = entry.heroImage ?? '';
+				el('blogBody').value = (entry.body ?? '').trim();
+				blogCategoryPicker.set(entry.categories ?? []);
+				blogRelatedPicker.set(entry.relatedObjects ?? []);
+			});
+
+			async function submitBlogPost() {
+				return fetch('/api/blog', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						id: el('blogId').value.trim(),
+						isEdit: el('blogMode').value === 'edit',
+						title: el('blogTitle').value.trim(),
+						description: el('blogDescription').value.trim(),
+						pubDate: el('blogPubDate').value,
+						updatedDate: el('blogUpdatedDate').value,
+						heroImage: el('blogHeroImage').value.trim(),
+						categories: blogCategoryPicker.get(),
+						relatedObjects: blogRelatedPicker.get(),
+						body: el('blogBody').value,
+					}),
+				});
+			}
+
+			// ---------- 연결 패널 (지금 편집 중인 항목이 실제로 어디와 연결돼 있는지) ----------
+			function renderConnectionList(list) {
+				if (list.length === 0) return `<p class="hint">없음</p>`;
+				return `<ul class="connection-list">${list
+					.map((o) => `<li>${o.title} <span class="hint">(${o.type})</span></li>`)
+					.join('')}</ul>`;
+			}
+
+			function renderConnections() {
+				const panel = el('connectionsPanel');
+				const isBlog = el('collection').value === 'blog';
+
+				if (isBlog) {
+					const outgoing = blogRelatedPicker
+						.get()
+						.map((id) => objMeta.objects.find((o) => o.id === id))
+						.filter(Boolean);
+					panel.innerHTML = `
+						<h3>연결</h3>
+						<p class="hint">이 글이 가리키는 객체 (relatedObjects)</p>
+						${renderConnectionList(outgoing)}
+					`;
+					return;
+				}
+
+				const currentId = el('objId').value.trim();
+				const outgoing = objRelatedPicker
+					.get()
+					.map((id) => objMeta.objects.find((o) => o.id === id))
+					.filter(Boolean);
+				const incoming = currentId
+					? objMeta.objects.filter(
+							(o) => o.id !== currentId && (o.relatedObjects ?? []).includes(currentId),
+						)
+					: [];
+
+				panel.innerHTML = `
+					<h3>연결</h3>
+					<p class="hint">이 객체가 가리키는 것 (relatedObjects)</p>
+					${renderConnectionList(outgoing)}
+					<p class="hint" style="margin-top: 1.5em">이 객체를 가리키는 것 (역참조)</p>
+					${renderConnectionList(incoming)}
+				`;
+			}
+
+			// ---------- 컬렉션 스위처 ----------
+			el('collection').addEventListener('change', () => {
+				const isBlog = el('collection').value === 'blog';
+				el('objectsSection').style.display = isBlog ? 'none' : 'block';
+				el('blogSection').style.display = isBlog ? 'block' : 'none';
+				renderConnections();
+			});
+
+			// ---------- 필수 필드 확인 (스키마의 required 필드와 동일한 기준) ----------
+			function validateObjectFields() {
+				const errors = [];
+				if (!el('objId').value.trim()) errors.push('파일명(id)');
+				if (!el('objType').value.trim()) errors.push('타입');
+				if (!el('objTitle').value.trim()) errors.push('제목');
+				return errors;
+			}
+
+			function validateBlogFields() {
+				const errors = [];
+				if (!el('blogId').value.trim()) errors.push('파일명(id)');
+				if (!el('blogTitle').value.trim()) errors.push('제목');
+				if (!el('blogDescription').value.trim()) errors.push('설명');
+				if (!el('blogPubDate').value) errors.push('발행일');
+				return errors;
+			}
+
+			// ---------- 제출 ----------
+			el('submit').addEventListener('click', async () => {
+				const statusEl = el('status');
+				const isBlog = el('collection').value === 'blog';
+
+				const missing = isBlog ? validateBlogFields() : validateObjectFields();
+				if (missing.length > 0) {
+					statusEl.textContent = `다음 항목을 채워주세요: ${missing.join(', ')}`;
+					statusEl.className = 'status-error';
+					return;
+				}
+
+				const res = await (isBlog ? submitBlogPost() : submitObject());
+				const result = await res.json();
+
+				if (res.ok) {
+					const dir = isBlog ? 'blog' : 'objects';
+					statusEl.textContent = `저장됨: src/content/${dir}/${result.id}.md`;
+					statusEl.className = 'status-ok';
+					await Promise.all([loadObjMeta(), loadBlogMeta()]);
+					renderConnections();
+				} else {
+					statusEl.textContent = `에러: ${result.error}`;
+					statusEl.className = 'status-error';
+				}
+			});
+
+			Promise.all([loadObjMeta(), loadBlogMeta()]).then(() => renderConnections());
+			addAttributeRow();
+			el('blogPubDate').value = new Date().toISOString().slice(0, 10);
+		</script>
+	</body>
+</html>
