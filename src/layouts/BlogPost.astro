@@ -1,5 +1,6 @@
 ---
 import { Image } from 'astro:assets';
+import { getEntries } from 'astro:content';
 import type { CollectionEntry } from 'astro:content';
 import BaseHead from '../components/BaseHead.astro';
 import Footer from '../components/Footer.astro';
@@ -8,8 +9,10 @@ import Header from '../components/Header.astro';
 
 type Props = CollectionEntry<'blog'>['data'];
 
-const { title, description, pubDate, updatedDate, heroImage, categories } = Astro.props;
+const { title, description, pubDate, updatedDate, heroImage, categories, relatedObjects } = Astro.props;
 const kicker = categories && categories.length > 0 ? categories.join(' · ') : 'Essay';
+const relatedObjectEntries =
+	relatedObjects && relatedObjects.length > 0 ? await getEntries(relatedObjects) : [];
 ---
 
 <html lang="en">
@@ -64,6 +67,29 @@ const kicker = categories && categories.length > 0 ? categories.join(' · ') : '
 			.last-updated-on {
 				font-style: italic;
 			}
+			.section-heading {
+				font-family: var(--font-sans);
+				font-size: 0.85em;
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+				color: var(--ink-dim);
+				margin: 0 0 1em 0;
+			}
+			.related-objects {
+				list-style: none;
+				margin: 0;
+				padding: 0;
+			}
+			.related-objects li {
+				margin-bottom: 0.5em;
+			}
+			.related-objects a {
+				color: var(--ink);
+				text-decoration: underline;
+			}
+			.related-objects a:hover {
+				color: var(--accent-bright);
+			}
 		</style>
 	</head>
 
@@ -91,6 +117,24 @@ const kicker = categories && categories.length > 0 ? categories.join(' · ') : '
 						<hr />
 					</div>
 					<slot />
+					{
+						relatedObjectEntries.length > 0 && (
+							<>
+								<hr />
+								<p class="section-heading">관련 객체</p>
+								<ul class="related-objects">
+									{relatedObjectEntries.map((related) => (
+										<li>
+											<a href={`${import.meta.env.BASE_URL}objects/${related.id}/`}>
+												{related.data.title}
+											</a>
+											<span> ({related.data.type})</span>
+										</li>
+									))}
+								</ul>
+							</>
+						)
+					}
 				</div>
 			</article>
 		</main>
