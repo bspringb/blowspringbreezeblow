@@ -68,26 +68,53 @@ export const CATEGORY_META: Record<CategoryKey, { label: string; order: number }
 [외부 사이트](https://example.com)
 ```
 
-## 나중에 새 "섹션"(컬렉션)을 추가하려면
+## 영화(films) / 감독(directors) 쓰기
 
-지금은 `blog` 컬렉션 하나뿐이지만, 감독/영화/책 같은 것을 개별 항목 페이지로 다루는 미니 데이터베이스로 확장하려면 아래 패턴을 따르세요.
+scaruffi.com처럼 감독별 필모그래피와 리뷰를 다루는 컬렉션입니다. `blog`와 별개의 컬렉션이라, 카테고리 시스템과는 무관하게 동작합니다.
 
-1. **콘텐츠 폴더 + 스키마 추가** (`src/content.config.ts`)
-   ```ts
-   const films = defineCollection({
-     loader: glob({ base: './src/content/films', pattern: '**/*.md' }),
-     schema: ({ image }) => z.object({
-       title: z.string(),
-       director: reference('directors'), // 다른 컬렉션 항목을 참조
-       year: z.number(),
-       genre: z.array(z.string()),
-       rating: z.number().optional(),
-     }),
-   });
-   export const collections = { blog, films, directors };
-   ```
-2. **컬렉션 간 링크는 `reference()`로.** `astro:content`가 제공하는 헬퍼로, 참조 대상 ID가 실제로 존재하는지 빌드 타임에 검증해줍니다. 오타로 링크가 끊기는 걸 막아줍니다.
-3. **리스트/상세 페이지는 새로 짜지 말고 재사용.** `PostList.astro`는 `posts` prop만 받으면 어떤 컬렉션이든 렌더링할 수 있게 만들어져 있습니다 (단, 카테고리 배지 부분은 `blog` 전용이라 컬렉션 성격이 다르면 필드를 맞추거나 얇게 분기하세요). 상세 페이지는 `BlogPost.astro`처럼 킥커-헤드라인-바이라인-본문 구조의 공용 레이아웃을 하나 더 만들어 재사용하세요.
-4. **라우팅은 `getStaticPaths`로 자동 생성.** `src/pages/blog/[category].astro`가 정확히 이 패턴입니다 — 고정 목록을 순회하며 페이지를 만듭니다. 새 컬렉션도 `getCollection('films')` 결과를 기반으로 `src/pages/films/[...slug].astro` 식으로 만들면 됩니다.
+### 감독 추가
+
+`src/content/directors/`에 파일을 추가합니다. 파일 이름(확장자 제외)이 곧 감독 ID이자 URL(`/directors/<id>/`)입니다.
+
+```yaml
+---
+title: '감독 이름'
+description: '한 줄 소개'   # 선택
+photo: ../../assets/xxx.jpg  # 선택
+---
+본문에는 약력/에세이를 원하는 만큼 길게 씁니다.
+```
+
+### 영화 추가
+
+`src/content/films/`에 파일을 추가합니다. `director` 값은 위에서 만든 감독 파일의 **파일명(확장자 제외)**과 정확히 일치해야 합니다.
+
+```yaml
+---
+title: '영화 제목'
+description: '한 줄 로그라인'   # 선택
+director: 감독파일명           # 필수 — directors 컬렉션의 파일 ID를 참조
+year: 2024
+genre: [drama, thriller]       # 선택, 자유 문자열
+rating: 3.5                    # 선택, 0~5점, 소수점 가능 (예: 2.1, 3.5)
+pubDate: 'Jul 22 2026'
+poster: ../../assets/xxx.jpg   # 선택
+---
+본문은 블로그 글처럼 긴 리뷰/에세이를 써도 됩니다.
+```
+
+`director`가 존재하지 않는 파일명을 가리키면(오타 포함) **빌드가 에러로 실패**합니다 — `reference()`가 빌드 타임에 검증해주기 때문입니다. 영화 상세 페이지(`/films/<id>/`)에는 감독 링크·연도·평점이 자동으로 뜨고, 감독 상세 페이지(`/directors/<id>/`)에는 그 감독의 필모그래피가 자동으로 모여서 뜹니다 (별도 연결 작업 불필요).
+
+`src/content/directors/example-director.md`, `src/content/films/example-film.md`는 이 구조가 실제로 동작하는지 확인하기 위한 예시입니다. 자유롭게 수정하거나 지우세요.
+
+## 나중에 또 다른 새 "섹션"(컬렉션)을 추가하려면
+
+`films`/`directors`가 정확히 이 패턴의 실제 예시입니다. 책, 음반 등을 더 추가하고 싶으면 같은 방식을 따르세요.
+
+1. **콘텐츠 폴더 + 스키마 추가** (`src/content.config.ts`) — `films`/`directors` 정의를 그대로 참고하세요.
+2. **컬렉션 간 링크는 `reference()`로.** 참조 대상 ID가 실제로 존재하는지 빌드 타임에 검증됩니다.
+3. **리스트는 `PostList.astro`/`FilmList.astro`처럼 컬렉션 전용 컴포넌트를 하나 만들어 재사용.** 컬렉션마다 보여줄 메타데이터(카테고리 배지 vs 감독·평점)가 달라서 완전히 공용화하기보다 컬렉션별로 얇은 리스트 컴포넌트를 두는 쪽이 더 명확합니다.
+4. **상세 레이아웃도 `BlogPost.astro`/`FilmPost.astro`처럼 컬렉션별로 하나씩.** 킥커-헤드라인-바이라인-본문 구조는 통일하되, 필드가 다르면 억지로 하나의 컴포넌트로 합치지 마세요.
+5. **라우팅은 `getStaticPaths`로 자동 생성.** `src/pages/films/[...slug].astro`, `src/pages/directors/[...slug].astro`가 예시입니다.
 
 이 문서도 함께 갱신하는 것 잊지 마세요.

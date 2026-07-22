@@ -1,0 +1,104 @@
+---
+import { Image } from 'astro:assets';
+import { getCollection, render } from 'astro:content';
+import BaseHead from '../../components/BaseHead.astro';
+import FilmList from '../../components/FilmList.astro';
+import Footer from '../../components/Footer.astro';
+import Header from '../../components/Header.astro';
+
+export async function getStaticPaths() {
+	const directors = await getCollection('directors');
+	return directors.map((director) => ({
+		params: { slug: director.id },
+		props: director,
+	}));
+}
+
+const director = Astro.props;
+const { title, description, photo } = director.data;
+const { Content } = await render(director);
+
+const allFilms = await getCollection('films');
+const films = allFilms
+	.filter((film) => film.data.director.id === director.id)
+	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+---
+
+<!doctype html>
+<html lang="ko">
+	<head>
+		<BaseHead title={title} description={description ?? title} />
+		<style>
+			main {
+				width: calc(100% - 2em);
+				max-width: 100%;
+				margin: 0;
+			}
+			.photo {
+				width: 300px;
+				max-width: calc(100% - 2em);
+				margin: 0 auto 2em auto;
+			}
+			.photo img {
+				display: block;
+				margin: 0 auto;
+				border-radius: 4px;
+				box-shadow: var(--box-shadow);
+			}
+			.prose {
+				width: 68ch;
+				max-width: calc(100% - 2em);
+				margin: auto;
+				padding: 1em;
+				color: var(--ink);
+			}
+			.title {
+				margin-bottom: 2em;
+				padding: 2em 0 1em 0;
+			}
+			.title h1 {
+				margin: 0 0 0.6em 0;
+				line-height: 1.15;
+			}
+			.filmography {
+				width: 68ch;
+				max-width: calc(100% - 2em);
+				margin: 3em auto;
+				padding: 0 1em;
+			}
+			.filmography h2 {
+				font-size: 1.2em;
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+				color: var(--ink-dim);
+				margin-bottom: 1em;
+			}
+		</style>
+	</head>
+	<body>
+		<Header />
+		<main>
+			<article>
+				<div class="photo">
+					{photo && <Image width={300} height={300} src={photo} alt="" />}
+				</div>
+				<div class="prose">
+					<div class="title">
+						<h1>{title}</h1>
+						<hr />
+					</div>
+					<Content />
+				</div>
+			</article>
+			{
+				films.length > 0 && (
+					<section class="filmography">
+						<h2>필모그래피</h2>
+						<FilmList films={films} />
+					</section>
+				)
+			}
+		</main>
+		<Footer />
+	</body>
+</html>

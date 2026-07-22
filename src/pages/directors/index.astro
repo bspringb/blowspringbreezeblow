@@ -1,0 +1,65 @@
+---
+import { getCollection } from 'astro:content';
+import BaseHead from '../../components/BaseHead.astro';
+import Footer from '../../components/Footer.astro';
+import Header from '../../components/Header.astro';
+
+const directors = await getCollection('directors');
+---
+
+<!doctype html>
+<html lang="ko">
+	<head>
+		<BaseHead title="감독" description="감독 소개" />
+		<style>
+			main {
+				width: 720px;
+			}
+			ul {
+				list-style: none;
+				margin: 0;
+				padding: 0;
+			}
+			li {
+				padding: 1.2em 0;
+				border-bottom: 1px solid var(--rule);
+			}
+			a {
+				display: block;
+				text-decoration: none;
+				color: inherit;
+			}
+			.title {
+				margin: 0 0 0.3em 0;
+			}
+			a:hover .title {
+				color: var(--accent-bright);
+			}
+			.description {
+				font-family: var(--font-serif);
+				color: var(--ink-dim);
+				margin: 0;
+			}
+		</style>
+	</head>
+	<body>
+		<Header />
+		<main>
+			<ul>
+				{
+					directors.map((director) => (
+						<li>
+							<a href={`${import.meta.env.BASE_URL}directors/${director.id}/`}>
+								<h3 class="title">{director.data.title}</h3>
+								{director.data.description && (
+									<p class="description">{director.data.description}</p>
+								)}
+							</a>
+						</li>
+					))
+				}
+			</ul>
+		</main>
+		<Footer />
+	</body>
+</html>

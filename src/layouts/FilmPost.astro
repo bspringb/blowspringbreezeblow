@@ -1,0 +1,104 @@
+---
+import { Image } from 'astro:assets';
+import type { CollectionEntry } from 'astro:content';
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+
+interface Props {
+	film: CollectionEntry<'films'>['data'];
+	director: CollectionEntry<'directors'>;
+}
+
+const { film, director } = Astro.props;
+const { title, description, year, genre, rating, poster } = film;
+const kicker = genre && genre.length > 0 ? genre.join(' · ') : '영화';
+---
+
+<html lang="ko">
+	<head>
+		<BaseHead title={title} description={description ?? title} />
+		<style>
+			main {
+				width: calc(100% - 2em);
+				max-width: 100%;
+				margin: 0;
+			}
+			.hero-image {
+				width: 400px;
+				max-width: calc(100% - 2em);
+				margin: 0 auto 2em auto;
+			}
+			.hero-image img {
+				display: block;
+				margin: 0 auto;
+				border-radius: 4px;
+				box-shadow: var(--box-shadow);
+			}
+			.prose {
+				width: 68ch;
+				max-width: calc(100% - 2em);
+				margin: auto;
+				padding: 1em;
+				color: var(--ink);
+			}
+			.title {
+				margin-bottom: 2em;
+				padding: 2em 0 1em 0;
+			}
+			.kicker {
+				font-family: var(--font-sans);
+				font-size: 0.85em;
+				text-transform: uppercase;
+				letter-spacing: 0.12em;
+				color: var(--accent-bright);
+				margin: 0 0 0.6em 0;
+			}
+			.title h1 {
+				margin: 0 0 0.6em 0;
+				line-height: 1.15;
+			}
+			.byline {
+				font-family: var(--font-sans);
+				font-size: 0.85em;
+				margin-bottom: 0.5em;
+				color: var(--ink-dim);
+			}
+			.byline a {
+				color: var(--ink-dim);
+				text-decoration: underline;
+			}
+			.byline a:hover {
+				color: var(--accent-bright);
+			}
+		</style>
+	</head>
+
+	<body>
+		<Header />
+		<main>
+			<article>
+				<div class="hero-image">
+					{poster && <Image width={640} height={400} src={poster} alt="" />}
+				</div>
+				<div class="prose">
+					<div class="title">
+						<p class="kicker">{kicker}</p>
+						<h1>{title}</h1>
+						<p class="byline">
+							<a href={`${import.meta.env.BASE_URL}directors/${director.id}/`}>
+								{director.data.title}
+							</a>
+							{' · '}
+							{year}
+							{rating !== undefined && <> · {rating.toFixed(1)} / 5</>}
+						</p>
+						<hr />
+					</div>
+					<slot />
+				</div>
+			</article>
+		</main>
+		<Footer />
+	</body>
+</html>

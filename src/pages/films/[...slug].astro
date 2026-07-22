@@ -1,0 +1,21 @@
+---
+import { type CollectionEntry, getCollection, getEntry, render } from 'astro:content';
+import FilmPost from '../../layouts/FilmPost.astro';
+
+export async function getStaticPaths() {
+	const films = await getCollection('films');
+	return films.map((film) => ({
+		params: { slug: film.id },
+		props: film,
+	}));
+}
+type Props = CollectionEntry<'films'>;
+
+const film = Astro.props;
+const { Content } = await render(film);
+const director = await getEntry(film.data.director);
+---
+
+<FilmPost film={film.data} director={director}>
+	<Content />
+</FilmPost>
