@@ -88,10 +88,15 @@
 			.row {
 				display: flex;
 				gap: 0.5em;
-				margin-bottom: 0.4em;
+				align-items: flex-start;
+				margin-bottom: 0.8em;
 			}
-			.row input {
+			.row > .attr-key {
+				flex: 0 0 140px;
+			}
+			.row > .attr-value-picker {
 				flex: 1;
+				min-width: 0;
 			}
 			.row button,
 			.small-button {
@@ -189,6 +194,7 @@
 		<select id="collection">
 			<option value="objects">objects (객체)</option>
 			<option value="blog">blog (글)</option>
+			<option value="nav">설정 (내비게이션)</option>
 		</select>
 
 		<div class="layout">
@@ -285,6 +291,25 @@
 			<textarea id="blogBody" style="min-height: 16em"></textarea>
 		</section>
 
+		<!-- ===================== 설정(내비게이션) 폼 ===================== -->
+		<section id="navSection" style="display: none">
+			<p class="hint">
+				상단 메뉴에서 어떤 타입을 다른 타입 아래로 묶을지 정합니다. <code>src/data/navGroups.json</code>에
+				저장되고, <code>src/lib/objectNav.ts</code>가 그대로 읽어서 씁니다.
+			</p>
+			<datalist id="navTypeOptions"></datalist>
+
+			<label>실제 타입 부모 (예: 영화 → 감독)</label>
+			<p class="hint">부모 자신도 실제 객체가 있는 타입입니다. 헤더를 누르면 부모+자식을 합친 목록으로 갑니다.</p>
+			<div id="typeChildrenRows"></div>
+			<button type="button" class="small-button" id="addTypeChild">+ 매핑 추가</button>
+
+			<label style="margin-top: 2em">가상 그룹 (예: 음악 → 아티스트, 앨범, 곡)</label>
+			<p class="hint">라벨 자신은 실제 타입이 아닙니다 — 순수 메뉴 묶음입니다.</p>
+			<div id="virtualGroupRows"></div>
+			<button type="button" class="small-button" id="addVirtualGroup">+ 그룹 추가</button>
+		</section>
+
 		<button id="submit">저장</button>
 		<div id="status"></div>
 
@@ -369,48 +394,69 @@
 			async function loadObjMeta() {
 				objMeta = await fetch('/api/meta').then((r) => r.json());
 				el('typeOptions').innerHTML = objMeta.types.map((t) => `<option value="${t}">`).join('');
+				el('navTypeOptions').innerHTML = objMeta.types.map((t) => `<option value="${t}">`).join('');
 				el('objExisting').innerHTML = objMeta.objects
 					.map((o) => `<option value="${o.id}">${o.title} (${o.type})</option>`)
 					.join('');
 			}
 
-			function populateDatalist(listEl, values) {
-				listEl.innerHTML = values.map((v) => `<option value="${v}">`).join('');
-			}
-
-			// 키 자동완성은 현재 타입이 기준, 값 자동완성은 "현재 타입 + 이 행의 키"가
-			// 기준이라 키를 바꿀 때마다, 그리고 타입을 바꿀 때마다 다시 계산해야 한다.
-			function refreshRowSuggestions(row) {
+			// 키 자동완성은 현재 타입 기준. 값은 멀티값 태그 피커라 추천 목록을
+			// getOptions()가 호출될 때마다 즉석에서 계산하므로 별도 갱신이 필요 없다 —
+			// 여기선 키 datalist만 타입이 바뀔 때 다시 채워주면 된다.
+			function refreshRowKeyOptions(row) {
 				const type = el('objType').value;
-				const keyInput = row.querySelector('.attr-key');
-				populateDatalist(row.querySelector('.attr-key-list'), objMeta.attributeKeysByType[type] ?? []);
-				const values = objMeta.attributeValuesByType[type]?.[keyInput.value] ?? [];
-				populateDatalist(row.querySelector('.attr-value-list'), values);
+				const keys = objMeta.attributeKeysByType[type] ?? [];
+				row.querySelector('.attr-key-list').innerHTML = keys.map((k) => `<option value="${k}">`).join('');
 			}
 
-			function addAttributeRow(key = '', value = '') {
+			// key: 속성 이름. values: 미리 선택돼있을 값 배열(수정 모드 등에서 채움).
+			function addAttributeRow(key = '', values = []) {
 				const row = document.createElement('div');
 				row.className = 'row';
 				const keyListId = `attr-keys-${Math.random().toString(36).slice(2)}`;
-				const valueListId = `attr-values-${Math.random().toString(36).slice(2)}`;
+				const rowId = Math.random().toString(36).slice(2);
 				row.innerHTML = `
 					<input type="text" placeholder="키" class="attr-key" list="${keyListId}" value="${key}">
 					<datalist class="attr-key-list" id="${keyListId}"></datalist>
-					<input type="text" placeholder="값" class="attr-value" list="${valueListId}" value="${value}">
-					<datalist class="attr-value-list" id="${valueListId}"></datalist>
+					<div class="attr-value-picker">
+						<input type="text" id="attr-value-search-${rowId}" placeholder="값 검색 또는 새로 입력...">
+						<div class="tag-results" id="attr-value-results-${rowId}"></div>
+						<div class="chips" id="attr-value-chips-${rowId}"></div>
+					</div>
 					<button type="button">✕</button>
 				`;
-				row.querySelector('.attr-key').addEventListener('input', () => refreshRowSuggestions(row));
-				row.querySelector('button').addEventListener('click', () => row.remove());
+
+				// createTagPicker는 내부에서 document.getElementById로 요소를 찾기 때문에,
+				// row가 아직 문서에 붙기 전(detached)이면 못 찾고 예외를 던진다 — 반드시
+				// appendChild를 먼저 해서 이 요소들이 실제 문서 트리에 들어간 뒤에 호출한다.
 				el('attributeRows').appendChild(row);
-				refreshRowSuggestions(row);
+
+				// 값은 "카테고리처럼" 여러 개를 칩으로 넣을 수 있게 공용 태그 피커를 그대로 재사용한다.
+				const valuePicker = createTagPicker({
+					searchInputId: `attr-value-search-${rowId}`,
+					resultsId: `attr-value-results-${rowId}`,
+					chipsId: `attr-value-chips-${rowId}`,
+					getOptions: () => {
+						const type = el('objType').value;
+						const currentKey = row.querySelector('.attr-key').value;
+						const suggestions = objMeta.attributeValuesByType[type]?.[currentKey] ?? [];
+						return suggestions.map((v) => ({ value: v, label: v }));
+					},
+					allowNew: true,
+				});
+				valuePicker.set(values);
+				row._valuePicker = valuePicker;
+
+				row.querySelector('.attr-key').addEventListener('input', () => refreshRowKeyOptions(row));
+				row.querySelector('button').addEventListener('click', () => row.remove());
+				refreshRowKeyOptions(row);
 			}
 
 			el('addAttribute').addEventListener('click', () => addAttributeRow());
 
 			// 새로 만들기 모드에서 타입을 지정하면, 그 타입에 등록된 적 있는 속성 키를
 			// 전부 빈 값으로 깔아준다 — 필요 없는 건 사용자가 ✕로 빼는 "뺄셈" 방식.
-			// 수정 모드에서는 불러온 객체의 실제 속성을 건드리지 않고 추천만 갱신한다.
+			// 수정 모드에서는 불러온 객체의 실제 속성을 건드리지 않고 키 추천만 갱신한다.
 			function populateAllAttributesForType() {
 				const type = el('objType').value;
 				const keys = objMeta.attributeKeysByType[type] ?? [];
@@ -419,14 +465,14 @@
 					addAttributeRow();
 					return;
 				}
-				for (const key of keys) addAttributeRow(key, '');
+				for (const key of keys) addAttributeRow(key, []);
 			}
 
 			el('objType').addEventListener('input', () => {
 				if (el('objMode').value === 'new') {
 					populateAllAttributesForType();
 				} else {
-					document.querySelectorAll('#attributeRows .row').forEach(refreshRowSuggestions);
+					document.querySelectorAll('#attributeRows .row').forEach(refreshRowKeyOptions);
 				}
 			});
 
@@ -458,7 +504,8 @@
 				el('objBody').value = (entry.body ?? '').trim();
 				el('attributeRows').innerHTML = '';
 				for (const [key, value] of Object.entries(entry.attributes ?? {})) {
-					addAttributeRow(key, String(value));
+					const values = Array.isArray(value) ? value.map(String) : [String(value)];
+					addAttributeRow(key, values);
 				}
 				objRelatedPicker.set(entry.relatedObjects ?? []);
 			});
@@ -470,7 +517,7 @@
 			async function submitObject() {
 				const attributes = [...document.querySelectorAll('#attributeRows .row')].map((row) => ({
 					key: row.querySelector('.attr-key').value,
-					value: row.querySelector('.attr-value').value,
+					values: row._valuePicker.get(),
 				}));
 
 				return fetch('/api/objects', {
@@ -575,6 +622,88 @@
 				});
 			}
 
+			// ---------- 설정(내비게이션) 폼: TYPE_CHILDREN / VIRTUAL_GROUPS ----------
+			let navGroupsData = { typeChildren: {}, virtualGroups: {} };
+
+			// parent/label: 텍스트 입력. members: 미리 선택돼있을 타입 배열.
+			// createTagPicker는 요소가 문서에 붙은 뒤에 호출해야 하므로(안 그러면
+			// document.getElementById가 못 찾고 예외를 던짐 — attributes 행에서 겪은 버그와 동일),
+			// 항상 appendChild를 먼저 하고 나서 만든다.
+			function addNavGroupRow(containerId, labelPlaceholder, label, members) {
+				const row = document.createElement('div');
+				row.className = 'row';
+				const rowId = Math.random().toString(36).slice(2);
+				row.innerHTML = `
+					<input type="text" class="attr-key" placeholder="${labelPlaceholder}" value="${label}" list="navTypeOptions">
+					<div class="attr-value-picker">
+						<input type="text" id="nav-search-${rowId}" placeholder="타입 검색...">
+						<div class="tag-results" id="nav-results-${rowId}"></div>
+						<div class="chips" id="nav-chips-${rowId}"></div>
+					</div>
+					<button type="button">✕</button>
+				`;
+				el(containerId).appendChild(row);
+
+				const picker = createTagPicker({
+					searchInputId: `nav-search-${rowId}`,
+					resultsId: `nav-results-${rowId}`,
+					chipsId: `nav-chips-${rowId}`,
+					getOptions: () => objMeta.types.map((t) => ({ value: t, label: t })),
+					allowNew: true,
+				});
+				picker.set(members);
+				row._membersPicker = picker;
+				row.querySelector('button').addEventListener('click', () => row.remove());
+				return row;
+			}
+
+			function addTypeChildRow(parent = '', children = []) {
+				addNavGroupRow('typeChildrenRows', '부모 타입', parent, children);
+			}
+
+			function addVirtualGroupRow(label = '', members = []) {
+				addNavGroupRow('virtualGroupRows', '그룹 라벨 (새 이름)', label, members);
+			}
+
+			el('addTypeChild').addEventListener('click', () => addTypeChildRow());
+			el('addVirtualGroup').addEventListener('click', () => addVirtualGroupRow());
+
+			async function loadNavMeta() {
+				navGroupsData = await fetch('/api/nav').then((r) => r.json());
+
+				el('typeChildrenRows').innerHTML = '';
+				const typeChildren = navGroupsData.typeChildren ?? {};
+				Object.entries(typeChildren).forEach(([parent, children]) => addTypeChildRow(parent, children));
+				if (Object.keys(typeChildren).length === 0) addTypeChildRow();
+
+				el('virtualGroupRows').innerHTML = '';
+				const virtualGroups = navGroupsData.virtualGroups ?? {};
+				Object.entries(virtualGroups).forEach(([label, members]) => addVirtualGroupRow(label, members));
+				if (Object.keys(virtualGroups).length === 0) addVirtualGroupRow();
+			}
+
+			async function submitNav() {
+				const typeChildren = {};
+				document.querySelectorAll('#typeChildrenRows .row').forEach((row) => {
+					const parent = row.querySelector('.attr-key').value.trim();
+					const children = row._membersPicker.get();
+					if (parent && children.length > 0) typeChildren[parent] = children;
+				});
+
+				const virtualGroups = {};
+				document.querySelectorAll('#virtualGroupRows .row').forEach((row) => {
+					const label = row.querySelector('.attr-key').value.trim();
+					const members = row._membersPicker.get();
+					if (label && members.length > 0) virtualGroups[label] = members;
+				});
+
+				return fetch('/api/nav', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ typeChildren, virtualGroups }),
+				});
+			}
+
 			// ---------- 연결 패널 (지금 편집 중인 항목이 실제로 어디와 연결돼 있는지) ----------
 			function renderConnectionList(list) {
 				if (list.length === 0) return `<p class="hint">없음</p>`;
@@ -585,7 +714,14 @@
 
 			function renderConnections() {
 				const panel = el('connectionsPanel');
-				const isBlog = el('collection').value === 'blog';
+				const collection = el('collection').value;
+
+				if (collection === 'nav') {
+					panel.innerHTML = '';
+					return;
+				}
+
+				const isBlog = collection === 'blog';
 
 				if (isBlog) {
 					const outgoing = blogRelatedPicker
@@ -622,9 +758,10 @@
 
 			// ---------- 컬렉션 스위처 ----------
 			el('collection').addEventListener('change', () => {
-				const isBlog = el('collection').value === 'blog';
-				el('objectsSection').style.display = isBlog ? 'none' : 'block';
-				el('blogSection').style.display = isBlog ? 'block' : 'none';
+				const value = el('collection').value;
+				el('objectsSection').style.display = value === 'objects' ? 'block' : 'none';
+				el('blogSection').style.display = value === 'blog' ? 'block' : 'none';
+				el('navSection').style.display = value === 'nav' ? 'block' : 'none';
 				renderConnections();
 			});
 
@@ -649,8 +786,23 @@
 			// ---------- 제출 ----------
 			el('submit').addEventListener('click', async () => {
 				const statusEl = el('status');
-				const isBlog = el('collection').value === 'blog';
+				const collection = el('collection').value;
 
+				if (collection === 'nav') {
+					const res = await submitNav();
+					const result = await res.json();
+					if (res.ok) {
+						statusEl.textContent = '저장됨: src/data/navGroups.json';
+						statusEl.className = 'status-ok';
+						await loadNavMeta();
+					} else {
+						statusEl.textContent = `에러: ${result.error}`;
+						statusEl.className = 'status-error';
+					}
+					return;
+				}
+
+				const isBlog = collection === 'blog';
 				const missing = isBlog ? validateBlogFields() : validateObjectFields();
 				if (missing.length > 0) {
 					statusEl.textContent = `다음 항목을 채워주세요: ${missing.join(', ')}`;
@@ -673,7 +825,7 @@
 				}
 			});
 
-			Promise.all([loadObjMeta(), loadBlogMeta()]).then(() => renderConnections());
+			Promise.all([loadObjMeta(), loadBlogMeta(), loadNavMeta()]).then(() => renderConnections());
 			addAttributeRow();
 			el('blogPubDate').value = new Date().toISOString().slice(0, 10);
 		</script>

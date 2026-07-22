@@ -11,6 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '../..');
 const OBJECTS_DIR = path.join(ROOT, 'src/content/objects');
 const BLOG_DIR = path.join(ROOT, 'src/content/blog');
+const NAV_GROUPS_PATH = path.join(ROOT, 'src/data/navGroups.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const PORT = 4322;
 
@@ -84,7 +85,9 @@ async function getMeta() {
 			for (const [key, value] of Object.entries(entry.attributes)) {
 				keySet.add(key);
 				const valueSet = valuesByKey[key] ?? new Set();
-				valueSet.add(String(value));
+				// 값이 배열(멀티값)이면 항목 하나하나를 추천 후보로 모은다.
+				const items = Array.isArray(value) ? value : [value];
+				for (const item of items) valueSet.add(String(item));
 				valuesByKey[key] = valueSet;
 			}
 			attributeKeysByType[entry.type] = keySet;
@@ -105,6 +108,25 @@ async function getMeta() {
 			]),
 		),
 	};
+}
+
+async function getNavGroups() {
+	const raw = await fs.readFile(NAV_GROUPS_PATH, 'utf-8');
+	return JSON.parse(raw);
+}
+
+function isValidNavGroupMap(map) {
+	return (
+		typeof map === 'object' &&
+		map !== null &&
+		!Array.isArray(map) &&
+		Object.values(map).every((v) => Array.isArray(v) && v.every((x) => typeof x === 'string'))
+	);
+}
+
+async function saveNavGroups({ typeChildren, virtualGroups }) {
+	const json = `${JSON.stringify({ typeChildren, virtualGroups }, null, '\t')}\n`;
+	await fs.writeFile(NAV_GROUPS_PATH, json, 'utf-8');
 }
 
 async function listBlogFiles() {
@@ -179,6 +201,21 @@ const server = http.createServer(async (req, res) => {
 			return send(res, 200, await readObject(file));
 		}
 
+		if (url.pathname === '/api/nav' && req.method === 'GET') {
+			return send(res, 200, await getNavGroups());
+		}
+
+		if (url.pathname === '/api/nav' && req.method === 'POST') {
+			const payload = await readJsonBody(req);
+			const typeChildren = payload.typeChildren ?? {};
+			const virtualGroups = payload.virtualGroups ?? {};
+			if (!isValidNavGroupMap(typeChildren) || !isValidNavGroupMap(virtualGroups)) {
+				return send(res, 400, { error: '형식이 올바르지 않습니다 (문자열 배열이어야 함)' });
+			}
+			await saveNavGroups({ typeChildren, virtualGroups });
+			return send(res, 200, { ok: true });
+		}
+
 		if (url.pathname.startsWith('/api/blog/') && req.method === 'GET') {
 			const id = decodeURIComponent(url.pathname.replace('/api/blog/', ''));
 			if (!isValidId(id)) return send(res, 400, { error: '잘못된 id' });
@@ -238,10 +275,16 @@ const server = http.createServer(async (req, res) => {
 				if (exists) return send(res, 409, { error: '같은 이름의 객체가 이미 있습니다' });
 			}
 
+			// 각 행은 {key, values: string[]} — 값이 하나면 스칼라로, 여러 개면
+			// 배열로 저장한다(기존 단일값 파일과 형식을 그대로 맞추기 위해).
 			const cleanedAttributes = {};
-			for (const { key, value } of attributes ?? []) {
+			for (const { key, values } of attributes ?? []) {
 				if (!key?.trim()) continue;
-				cleanedAttributes[key.trim()] = coerceAttributeValue(value ?? '');
+				const coerced = (values ?? [])
+					.filter((v) => v?.trim())
+					.map((v) => coerceAttributeValue(v));
+				if (coerced.length === 0) continue;
+				cleanedAttributes[key.trim()] = coerced.length === 1 ? coerced[0] : coerced;
 			}
 
 			const data = {

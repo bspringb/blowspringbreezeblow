@@ -37,7 +37,14 @@ const objects = defineCollection({
 			type: z.string(),
 			title: z.string(),
 			description: z.string().optional(),
-			attributes: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
+			// 값 하나짜리는 스칼라(연도: 1939)로, 여러 개는 배열(장르: [드라마, 스릴러])로 —
+			// 기존 단일값 파일과 호환되면서 모든 속성이 멀티값도 가능하게 유니언으로 둔다.
+			attributes: z
+				.record(
+					z.string(),
+					z.union([z.string(), z.number(), z.array(z.union([z.string(), z.number()]))]),
+				)
+				.optional(),
 			relatedObjects: z.array(reference('objects')).optional(),
 			image: z.optional(image()),
 		}),

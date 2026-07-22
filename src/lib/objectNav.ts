@@ -1,18 +1,11 @@
+import navGroups from '../data/navGroups.json';
 import { getAllObjectTypes } from './objects';
 
-// 어떤 타입이 다른 "실제 타입" 밑에 묶여 보일지 정의한다. 부모 자신도 실제 객체가
-// 있는 타입이다 (예: 영화 객체가 실제로 존재). 여기 없는 타입은 전부 최상위로
-// 노출된다 — 새 타입을 추가해도 기본적으로는 코드 수정 없이 최상위에 나타나고,
-// 특정 타입 아래로 묶고 싶을 때만 이 파일을 고친다.
-const TYPE_CHILDREN: Record<string, string[]> = {
-	영화: ['감독'],
-};
-
-// 실제 타입이 아니라 메뉴에만 존재하는 묶음 라벨. 이 라벨 자신은 objects/type/
-// 페이지가 없다(그런 타입의 객체가 없으므로).
-export const VIRTUAL_GROUPS: Record<string, string[]> = {
-	음악: ['아티스트', '앨범', '곡'],
-};
+// 어떤 타입이 다른 "실제 타입" 밑에 묶여 보일지, 그리고 실제 타입이 아닌 메뉴 전용
+// 묶음 라벨은 무엇인지 — 둘 다 src/data/navGroups.json에 있다. 코드가 아니라 데이터라서
+// 관리자 폼(npm run admin, "설정" 탭)에서 직접 편집할 수 있다.
+const TYPE_CHILDREN: Record<string, string[]> = navGroups.typeChildren;
+export const VIRTUAL_GROUPS: Record<string, string[]> = navGroups.virtualGroups;
 
 export interface NavTypeGroup {
 	type: string;
