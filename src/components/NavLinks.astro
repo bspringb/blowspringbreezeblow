@@ -7,12 +7,12 @@ const base = import.meta.env.BASE_URL;
 ---
 
 <div class="nav-links-wrap">
-	<HeaderLink href={`${base}texts`}>Texts</HeaderLink>
+	<HeaderLink href={`${base}texts`} class="texts-link">Texts</HeaderLink>
 	<div class="blind-wrap">
 		<div class="nav-links" id="nav-links">
 			{
 				groups.map((group) => (
-					<div class="hover-menu" data-nav-item>
+					<div class="hover-menu" data-nav-item data-priority={group.isPriority ? 'true' : undefined}>
 						<HeaderLink href={`${base}${group.href}`}>{group.type}</HeaderLink>
 						{group.children.length > 0 && (
 							<div class="hover-popup">
@@ -27,7 +27,7 @@ const base = import.meta.env.BASE_URL;
 			}
 		</div>
 		<button type="button" class="nav-toggle" id="nav-toggle" aria-expanded="false" hidden>
-			펼치기 ▾
+			<span class="nav-toggle-label">펼치기</span><span class="nav-toggle-arrow"></span>
 		</button>
 		<div class="nav-overflow" id="nav-overflow"></div>
 	</div>
@@ -47,6 +47,9 @@ const base = import.meta.env.BASE_URL;
 		align-items: center;
 		flex: 1 1 auto;
 		min-width: 0;
+		/* 시작 위치(Texts 바로 다음)는 그대로 두고 상시표시 줄의 폭만 줄인다 —
+		   오버플로우 판정 기준도 이 요소의 실제 폭이라 자동으로 더 일찍 넘친다. */
+		max-width: 45%;
 	}
 	/* 항상 보이는 한 줄 — 여기 들어있는 항목은 펼치기와 무관하게 자기 자리에 그대로 있다 */
 	.nav-links {
@@ -56,7 +59,7 @@ const base = import.meta.env.BASE_URL;
 		align-items: center;
 		overflow: hidden;
 		min-width: 0;
-		height: 3.2em;
+		height: 1.8em;
 	}
 	/* 한 줄에 남아있는 항목을 호버할 때만 클리핑을 잠시 풀어서 팝업이 안 잘리게 */
 	.nav-links:has(.hover-menu:hover),
@@ -65,43 +68,115 @@ const base = import.meta.env.BASE_URL;
 	}
 	.nav-toggle {
 		flex: 0 0 auto;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35em;
 		background: none;
 		border: none;
 		color: var(--ink-dim);
 		font-family: var(--font-sans);
-		font-size: 0.85em;
+		font-size: 0.65em;
+		font-weight: 400;
 		cursor: pointer;
-		padding: 1em 0.5em;
+		padding: 0.4em 0.5em 0em;
 	}
 	.nav-toggle:hover {
 		color: var(--accent-bright);
 	}
+	/* ▾ 유니코드 글리프는 폰트마다 상하좌우 여백(bearing)이 비대칭이라, 아무리
+	   박스를 정확히 맞춰도 글자 자체가 박스 중심에 안 그려져서 회전시키면 위치가
+	   틀어진다. 폰트에 아예 의존하지 않는 순수 CSS 삼각형(border trick)으로
+	   그리면 기하학적으로 완전 대칭이라 180도 회전해도 제자리에서만 돈다.
+	   버튼을 flex로 만들어 align-items:center로 세로 중앙을 맞춘다 — 삼각형은
+	   테두리로만 그려서 박스 높이가 0이라 vertical-align 기준의 정렬은 안 맞는다. */
+	.nav-toggle-arrow {
+		display: inline-block;
+		flex: 0 0 auto;
+		width: 0;
+		height: 0;
+		/* border-top만 있어서 보이는 삼각형이 이 박스(높이 0)보다 위쪽으로만
+		   그려진다 — flex가 중앙 정렬하는 건 이 안 보이는 0높이 박스라서,
+		   실제 삼각형은 그만큼(테두리 두께의 절반) 위로 떠 보인다. 절반만큼
+		   아래로 밀어서 시각적 중심을 flex 중앙선에 맞춘다. */
+		margin-top: 3px;
+		border-left: 4px solid transparent;
+		border-right: 4px solid transparent;
+		border-top: 5px solid currentColor;
+		transition: transform 0.15s ease;
+	}
+	.nav-toggle.is-open .nav-toggle-arrow {
+		transform: rotate(180deg);
+	}
 	/* 안 보이던(넘쳤던) 항목만 여기로 옮겨져서, 검색창 자동완성처럼 아래에 붙어 뜬다.
-	   구글/사파리 주소창처럼 각지고 그림자만 있는 드롭다운 — 팝업 카드 아님. */
+	   구글/사파리 주소창처럼 각지고 그림자만 있는 드롭다운 — 팝업 카드 아님.
+	   초성별로 줄을 나눠서 보여주므로 세로(column) 방향으로 쌓는다. */
 	.nav-overflow {
 		display: none;
 		position: absolute;
-		top: 104%;
+		top: 108%;
 		left: 0;
 		width: 83%;
-		flex-direction: row;
-		flex-wrap: wrap;
+		flex-direction: column;
+		gap: 0.1em;
 		background: var(--bg);
 		border: 1px solid var(--rule);
 		box-shadow: 0px;
-		padding: 0em;
+		padding: 0em 0.4em 0.3em 0.4em;
 		z-index: 20;
 	}
 	.nav-overflow.open {
 		display: flex;
 	}
+	/* 상시표시 줄은 은은하게(ink-dim), 펼쳐진 패널 안에서는 또렷하게 보여야
+	   "숨겨졌던 항목들"이라는 느낌이 나고 읽기도 편하다. 항목 수가 늘어난 만큼
+	   글자 크기/패딩은 상시표시 줄보다 더 작고 촘촘하게 잡는다. */
+	.nav-overflow :global(a) {
+		color: var(--ink);
+		font-size: 0.75em;
+		padding: 0.05em 0.25em 0em;
+	}
+	.nav-overflow :global(a:hover) {
+		color: var(--accent-bright);
+	}
+	/* 넘침 처리됐지만 우선순위 목록에 있던 항목들 — 초성 묶음과 섞이지 않게
+	   맨 위 별도 줄에, 구분선을 두고 보여준다.
+	   이 아래 세 클래스는 전부 스크립트가 document.createElement로 만드는
+	   요소라, 정적 템플릿에 없어서 Astro의 스코프 속성이 안 찍힌다 —
+	   :global()로 안 감싸면 아무리 값을 바꿔도 실제로는 하나도 안 먹는다. */
+	:global(.nav-overflow-pinned) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.1em 0.2em;
+		padding-bottom: 0.2em;
+		border-bottom: 1px solid var(--rule);
+	}
+	:global(.nav-overflow-row) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.1em 0.2em;
+	}
+	:global(.chosung-label) {
+		flex: 0 0 auto;
+		font-family: var(--font-sans);
+		font-size: 0.65em;
+		font-weight: 400;
+		color: rgba(234, 232, 232, 0.753);
+		margin-right: 0.15em;
+	}
 	.nav-links-wrap :global(a) {
-		padding: 1em 0.5em;
+		padding: 0.4em 0.5em 0em;
 		color: var(--ink-dim);
 		border-bottom: 2px solid transparent;
 		text-decoration: none;
-		font-size: 0.9em;
+		font-family: var(--font-serif);
+		font-size: 0.75em;
 		letter-spacing: 0.04em;
+	}
+	/* Texts만 따로 살짝 아래로 내림 */
+	.nav-links-wrap :global(a.texts-link) {
+		padding-top: 0.55em;
 	}
 	.nav-links-wrap :global(a.active) {
 		color: var(--ink);
@@ -140,6 +215,7 @@ const base = import.meta.env.BASE_URL;
 <script>
 	const container = document.getElementById('nav-links');
 	const toggle = document.getElementById('nav-toggle');
+	const toggleLabel = toggle?.querySelector('.nav-toggle-label');
 	const overflowPanel = document.getElementById('nav-overflow');
 
 	// 넘침 판단 기준은 nav-links 자신이 아니라 부모(blind-wrap)여야 한다 —
@@ -149,9 +225,29 @@ const base = import.meta.env.BASE_URL;
 	// 잘못 판정된다.
 	const wrap = container?.parentElement;
 
+	// 한글 초성 19개(유니코드 완성형 한글의 분해 순서와 동일). 첫 글자가 이
+	// 목록에 안 걸리면(한글 완성형이 아니면) '#'으로 묶는다.
+	const CHOSUNG_LIST = [
+		'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ',
+		'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ',
+	];
+
+	function getChosung(text: string): string {
+		const code = (text.charCodeAt(0) ?? 0) - 0xac00;
+		if (code < 0 || code > 11171) return '#';
+		return CHOSUNG_LIST[Math.floor(code / 588)];
+	}
+
+	function itemLabel(item: HTMLElement): string {
+		return item.querySelector(':scope > a')?.textContent?.trim() ?? '';
+	}
+
 	if (container && wrap && toggle && overflowPanel) {
 		const items = Array.from(container.querySelectorAll<HTMLElement>(':scope > [data-nav-item]'));
-		const TOGGLE_RESERVED_WIDTH = 60;
+		// "펼치기 ▾" 버튼의 실제 렌더링 폭(한글 3글자+화살표+좌우 패딩)은 60px보다
+		// 넓어서, 여유를 너무 박하게 잡으면 버튼에 밀린 nav-links가 마지막 "안전"
+		// 항목 텍스트를 잘라먹을 수 있다. 넉넉하게 잡는다.
+		const TOGGLE_RESERVED_WIDTH = 100;
 
 		const layout = () => {
 			// 측정을 정확히 하기 위해 일단 전부 원래 자리(한 줄)로 되돌린다.
@@ -162,19 +258,55 @@ const base = import.meta.env.BASE_URL;
 
 			const overflowing = items.filter((item) => item.getBoundingClientRect().right > limit);
 
-			overflowPanel.replaceChildren(...overflowing);
+			overflowPanel.innerHTML = '';
+
+			// 우선순위 목록에 있었는데도 폭이 모자라 밀린 항목은 초성 묶음과 섞지
+			// 않고 맨 위 별도 줄에, 구분선을 두고 보여준다.
+			const pinned = overflowing.filter((item) => item.dataset.priority === 'true');
+			const rest = overflowing.filter((item) => item.dataset.priority !== 'true');
+
+			if (pinned.length > 0) {
+				const pinnedRow = document.createElement('div');
+				pinnedRow.className = 'nav-overflow-pinned';
+				pinnedRow.append(...pinned);
+				overflowPanel.appendChild(pinnedRow);
+			}
+
+			const byChosung = new Map<string, HTMLElement[]>();
+			for (const item of rest) {
+				const ch = getChosung(itemLabel(item));
+				if (!byChosung.has(ch)) byChosung.set(ch, []);
+				byChosung.get(ch)!.push(item);
+			}
+
+			for (const ch of [...CHOSUNG_LIST, '#']) {
+				const groupItems = byChosung.get(ch);
+				if (!groupItems || groupItems.length === 0) continue;
+
+				const row = document.createElement('div');
+				row.className = 'nav-overflow-row';
+				const label = document.createElement('span');
+				label.className = 'chosung-label';
+				label.textContent = ch;
+				row.appendChild(label);
+				row.append(...groupItems);
+				overflowPanel.appendChild(row);
+			}
+
 			toggle.hidden = overflowing.length === 0;
 			if (overflowing.length === 0) {
 				overflowPanel.classList.remove('open');
 				toggle.setAttribute('aria-expanded', 'false');
-				toggle.textContent = '펼치기 ▾';
+				toggle.classList.remove('is-open');
+				if (toggleLabel) toggleLabel.textContent = '펼치기';
 			}
 		};
 
 		toggle.addEventListener('click', () => {
 			const open = overflowPanel.classList.toggle('open');
 			toggle.setAttribute('aria-expanded', String(open));
-			toggle.textContent = open ? '접기 ▴' : '펼치기 ▾';
+			toggle.classList.toggle('is-open', open);
+			if (toggleLabel) toggleLabel.textContent = open ? '접기' : '펼치기';
 		});
 
 		window.addEventListener('resize', layout);

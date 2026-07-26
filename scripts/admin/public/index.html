@@ -308,6 +308,15 @@
 			<p class="hint">라벨 자신은 실제 타입이 아닙니다 — 순수 메뉴 묶음입니다.</p>
 			<div id="virtualGroupRows"></div>
 			<button type="button" class="small-button" id="addVirtualGroup">+ 그룹 추가</button>
+
+			<label style="margin-top: 2em">상시표시 우선순위</label>
+			<p class="hint">
+				상단 줄 폭이 모자라 다 못 보일 때, 여기 순서대로 먼저 남고 나머지가 "펼치기"로 밀립니다. 여기 없는
+				타입/그룹은 이 목록 뒤에 원래 순서(알파벳순 → 가상 그룹)대로 붙습니다.
+			</p>
+			<input type="text" id="navPrioritySearch" placeholder="타입/그룹을 검색해서 순서대로 추가..." />
+			<div class="tag-results" id="navPriorityResults"></div>
+			<div class="chips" id="navPriorityChips"></div>
 		</section>
 
 		<button id="submit">저장</button>
@@ -668,6 +677,30 @@
 			el('addTypeChild').addEventListener('click', () => addTypeChildRow());
 			el('addVirtualGroup').addEventListener('click', () => addVirtualGroupRow());
 
+			// 상시표시 줄에서 어떤 타입/그룹이 먼저 오고 늦게 넘칠지 정하는 순서 목록.
+			// 선택 순서 = 칩이 쌓이는 순서 = 실제 우선순위 순서라서 별도 정렬 UI 없이도 순서를 표현한다.
+			// 후보는 실제 타입뿐 아니라 가상 그룹 라벨(예: 음악)도 포함해야 하므로, 매번 호출 시점에
+			// objMeta.types + navGroupsData.virtualGroups의 키를 합쳐서 계산한다. typeChildren/virtualGroups의
+			// "자식" 타입(예: 영화 장르)은 애초에 상단 메뉴에 자기 자리로 뜨지 않으므로(부모 호버 팝업에만
+			// 나타남) 골라봤자 아무 효과가 없다 — 후보에서 아예 뺀다.
+			const navPriorityPicker = createTagPicker({
+				searchInputId: 'navPrioritySearch',
+				resultsId: 'navPriorityResults',
+				chipsId: 'navPriorityChips',
+				getOptions: () => {
+					const virtualLabels = Object.keys(navGroupsData.virtualGroups ?? {});
+					const childNames = new Set([
+						...Object.values(navGroupsData.typeChildren ?? {}).flat(),
+						...Object.values(navGroupsData.virtualGroups ?? {}).flat(),
+					]);
+					const all = [...new Set([...objMeta.types, ...virtualLabels])].filter(
+						(t) => !childNames.has(t),
+					);
+					return all.map((t) => ({ value: t, label: t }));
+				},
+				allowNew: false,
+			});
+
 			async function loadNavMeta() {
 				navGroupsData = await fetch('/api/nav').then((r) => r.json());
 
@@ -680,6 +713,8 @@
 				const virtualGroups = navGroupsData.virtualGroups ?? {};
 				Object.entries(virtualGroups).forEach(([label, members]) => addVirtualGroupRow(label, members));
 				if (Object.keys(virtualGroups).length === 0) addVirtualGroupRow();
+
+				navPriorityPicker.set(navGroupsData.priorityOrder ?? []);
 			}
 
 			async function submitNav() {
@@ -700,7 +735,7 @@
 				return fetch('/api/nav', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ typeChildren, virtualGroups }),
+					body: JSON.stringify({ typeChildren, virtualGroups, priorityOrder: navPriorityPicker.get() }),
 				});
 			}
 

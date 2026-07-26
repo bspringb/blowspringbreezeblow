@@ -124,8 +124,12 @@ function isValidNavGroupMap(map) {
 	);
 }
 
-async function saveNavGroups({ typeChildren, virtualGroups }) {
-	const json = `${JSON.stringify({ typeChildren, virtualGroups }, null, '\t')}\n`;
+function isValidStringArray(arr) {
+	return Array.isArray(arr) && arr.every((x) => typeof x === 'string');
+}
+
+async function saveNavGroups({ typeChildren, virtualGroups, priorityOrder }) {
+	const json = `${JSON.stringify({ typeChildren, virtualGroups, priorityOrder }, null, '\t')}\n`;
 	await fs.writeFile(NAV_GROUPS_PATH, json, 'utf-8');
 }
 
@@ -209,10 +213,15 @@ const server = http.createServer(async (req, res) => {
 			const payload = await readJsonBody(req);
 			const typeChildren = payload.typeChildren ?? {};
 			const virtualGroups = payload.virtualGroups ?? {};
-			if (!isValidNavGroupMap(typeChildren) || !isValidNavGroupMap(virtualGroups)) {
+			const priorityOrder = payload.priorityOrder ?? [];
+			if (
+				!isValidNavGroupMap(typeChildren) ||
+				!isValidNavGroupMap(virtualGroups) ||
+				!isValidStringArray(priorityOrder)
+			) {
 				return send(res, 400, { error: '형식이 올바르지 않습니다 (문자열 배열이어야 함)' });
 			}
-			await saveNavGroups({ typeChildren, virtualGroups });
+			await saveNavGroups({ typeChildren, virtualGroups, priorityOrder });
 			return send(res, 200, { ok: true });
 		}
 
