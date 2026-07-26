@@ -112,6 +112,54 @@
 				color: #e0a45e;
 				border-color: #e0a45e;
 			}
+			.list-details {
+				margin-bottom: 1.5em;
+				border: 1px solid #4a3d3a;
+				border-radius: 4px;
+				padding: 0.6em 0.8em;
+			}
+			.list-details summary {
+				cursor: pointer;
+				color: #b8aca6;
+				font-size: 0.9em;
+			}
+			.list-table {
+				width: 100%;
+				border-collapse: collapse;
+				font-size: 0.85em;
+				margin-top: 0.8em;
+			}
+			.list-table th,
+			.list-table td {
+				text-align: left;
+				padding: 0.35em 0.5em;
+				border-bottom: 1px solid #2f2523;
+			}
+			.list-table th {
+				color: #8a7d78;
+				font-weight: normal;
+			}
+			.list-table td.id-cell {
+				color: #8a7d78;
+				font-size: 0.9em;
+			}
+			.list-table button {
+				background: none;
+				border: 1px solid #4a3d3a;
+				color: #b8aca6;
+				border-radius: 4px;
+				cursor: pointer;
+				padding: 0.15em 0.5em;
+				font-size: 0.9em;
+			}
+			.list-table button:hover {
+				color: #e0a45e;
+				border-color: #e0a45e;
+			}
+			.list-table button.delete-button:hover {
+				color: #d97b6c;
+				border-color: #d97b6c;
+			}
 			.chips {
 				display: flex;
 				flex-wrap: wrap;
@@ -202,6 +250,22 @@
 
 		<!-- ===================== objects 폼 ===================== -->
 		<section id="objectsSection">
+			<details class="list-details" id="objectsListDetails">
+				<summary>전체 객체 목록 (<span id="objectsListCount">0</span>)</summary>
+				<table class="list-table">
+					<thead>
+						<tr>
+							<th>타입</th>
+							<th>제목</th>
+							<th>id</th>
+							<th></th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody id="objectsListBody"></tbody>
+				</table>
+			</details>
+
 			<label for="objMode">모드</label>
 			<select id="objMode">
 				<option value="new">새로 만들기</option>
@@ -241,6 +305,22 @@
 
 		<!-- ===================== blog 폼 ===================== -->
 		<section id="blogSection" style="display: none">
+			<details class="list-details" id="blogListDetails">
+				<summary>전체 글 목록 (<span id="blogListCount">0</span>)</summary>
+				<table class="list-table">
+					<thead>
+						<tr>
+							<th>발행일</th>
+							<th>제목</th>
+							<th>id</th>
+							<th></th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody id="blogListBody"></tbody>
+				</table>
+			</details>
+
 			<label for="blogMode">모드</label>
 			<select id="blogMode">
 				<option value="new">새로 만들기</option>
@@ -407,6 +487,57 @@
 				el('objExisting').innerHTML = objMeta.objects
 					.map((o) => `<option value="${o.id}">${o.title} (${o.type})</option>`)
 					.join('');
+				renderObjectsList();
+			}
+
+			function renderObjectsList() {
+				const sorted = [...objMeta.objects].sort(
+					(a, b) => a.type.localeCompare(b.type) || a.title.localeCompare(b.title),
+				);
+				el('objectsListCount').textContent = sorted.length;
+				el('objectsListBody').innerHTML = sorted
+					.map(
+						(o) => `
+							<tr>
+								<td>${o.type}</td>
+								<td>${o.title}</td>
+								<td class="id-cell">${o.id}</td>
+								<td><button type="button" data-edit-object="${o.id}">수정</button></td>
+								<td><button type="button" class="delete-button" data-delete-object="${o.id}">삭제</button></td>
+							</tr>
+						`,
+					)
+					.join('');
+
+				el('objectsListBody')
+					.querySelectorAll('[data-edit-object]')
+					.forEach((btn) =>
+						btn.addEventListener('click', () => {
+							el('objMode').value = 'edit';
+							el('objMode').dispatchEvent(new Event('change'));
+							el('objExisting').value = btn.dataset.editObject;
+							el('objExisting').dispatchEvent(new Event('change'));
+							el('objectsListDetails').open = false;
+							window.scrollTo({ top: 0, behavior: 'smooth' });
+						}),
+					);
+				el('objectsListBody')
+					.querySelectorAll('[data-delete-object]')
+					.forEach((btn) =>
+						btn.addEventListener('click', () => deleteObject(btn.dataset.deleteObject)),
+					);
+			}
+
+			async function deleteObject(id) {
+				if (!confirm(`"${id}" 객체를 정말 삭제할까요? 되돌릴 수 없습니다.`)) return;
+				const res = await fetch(`/api/objects/${encodeURIComponent(id)}`, { method: 'DELETE' });
+				if (res.ok) {
+					await loadObjMeta();
+					renderConnections();
+				} else {
+					const result = await res.json();
+					alert(`삭제 실패: ${result.error}`);
+				}
 			}
 
 			// 키 자동완성은 현재 타입 기준. 값은 멀티값 태그 피커라 추천 목록을
@@ -570,6 +701,53 @@
 				el('blogExisting').innerHTML = blogMeta.posts
 					.map((p) => `<option value="${p.id}">${p.title}</option>`)
 					.join('');
+				renderBlogList();
+			}
+
+			function renderBlogList() {
+				const sorted = [...blogMeta.posts].sort((a, b) => (b.pubDate ?? '').localeCompare(a.pubDate ?? ''));
+				el('blogListCount').textContent = sorted.length;
+				el('blogListBody').innerHTML = sorted
+					.map(
+						(p) => `
+							<tr>
+								<td>${p.pubDate ? new Date(p.pubDate).toLocaleDateString('ko-KR') : ''}</td>
+								<td>${p.title}</td>
+								<td class="id-cell">${p.id}</td>
+								<td><button type="button" data-edit-post="${p.id}">수정</button></td>
+								<td><button type="button" class="delete-button" data-delete-post="${p.id}">삭제</button></td>
+							</tr>
+						`,
+					)
+					.join('');
+
+				el('blogListBody')
+					.querySelectorAll('[data-edit-post]')
+					.forEach((btn) =>
+						btn.addEventListener('click', () => {
+							el('blogMode').value = 'edit';
+							el('blogMode').dispatchEvent(new Event('change'));
+							el('blogExisting').value = btn.dataset.editPost;
+							el('blogExisting').dispatchEvent(new Event('change'));
+							el('blogListDetails').open = false;
+							window.scrollTo({ top: 0, behavior: 'smooth' });
+						}),
+					);
+				el('blogListBody')
+					.querySelectorAll('[data-delete-post]')
+					.forEach((btn) => btn.addEventListener('click', () => deleteBlogPost(btn.dataset.deletePost)));
+			}
+
+			async function deleteBlogPost(id) {
+				if (!confirm(`"${id}" 글을 정말 삭제할까요? 되돌릴 수 없습니다.`)) return;
+				const res = await fetch(`/api/blog/${encodeURIComponent(id)}`, { method: 'DELETE' });
+				if (res.ok) {
+					await loadBlogMeta();
+					renderConnections();
+				} else {
+					const result = await res.json();
+					alert(`삭제 실패: ${result.error}`);
+				}
 			}
 
 			function resetBlogForm() {

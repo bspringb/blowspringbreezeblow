@@ -5,7 +5,18 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import yaml from 'js-yaml';
+
+const execFileAsync = promisify(execFile);
+
+// 삭제는 fs.unlink(터미널 rm과 동일, 영구 삭제)가 아니라 macOS Finder의
+// 휴지통으로 보낸다 — 실수로 지워도 휴지통에서 되돌릴 수 있게.
+async function moveToTrash(filePath) {
+	const escaped = filePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+	await execFileAsync('osascript', ['-e', `tell application "Finder" to delete POSIX file "${escaped}"`]);
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '../..');
@@ -152,7 +163,7 @@ async function getBlogMeta() {
 
 	for (const file of files) {
 		const entry = await readBlogPost(file);
-		posts.push({ id: entry.id, title: entry.title });
+		posts.push({ id: entry.id, title: entry.title, pubDate: entry.pubDate ?? null });
 		for (const c of entry.categories ?? []) categories.add(c);
 	}
 
@@ -205,6 +216,16 @@ const server = http.createServer(async (req, res) => {
 			return send(res, 200, await readObject(file));
 		}
 
+		if (url.pathname.startsWith('/api/objects/') && req.method === 'DELETE') {
+			const id = decodeURIComponent(url.pathname.replace('/api/objects/', ''));
+			if (!isValidId(id)) return send(res, 400, { error: '잘못된 id' });
+			const files = await listObjectFiles();
+			const file = files.find((f) => f.replace(/\.[^/.]+$/, '') === id);
+			if (!file) return send(res, 404, { error: '찾을 수 없음' });
+			await moveToTrash(path.join(OBJECTS_DIR, file));
+			return send(res, 200, { ok: true });
+		}
+
 		if (url.pathname === '/api/nav' && req.method === 'GET') {
 			return send(res, 200, await getNavGroups());
 		}
@@ -232,6 +253,16 @@ const server = http.createServer(async (req, res) => {
 			const file = files.find((f) => f.replace(/\.[^/.]+$/, '') === id);
 			if (!file) return send(res, 404, { error: '찾을 수 없음' });
 			return send(res, 200, await readBlogPost(file));
+		}
+
+		if (url.pathname.startsWith('/api/blog/') && req.method === 'DELETE') {
+			const id = decodeURIComponent(url.pathname.replace('/api/blog/', ''));
+			if (!isValidId(id)) return send(res, 400, { error: '잘못된 id' });
+			const files = await listBlogFiles();
+			const file = files.find((f) => f.replace(/\.[^/.]+$/, '') === id);
+			if (!file) return send(res, 404, { error: '찾을 수 없음' });
+			await moveToTrash(path.join(BLOG_DIR, file));
+			return send(res, 200, { ok: true });
 		}
 
 		if (url.pathname === '/api/blog' && req.method === 'POST') {
